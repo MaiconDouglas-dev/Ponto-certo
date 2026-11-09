@@ -52,7 +52,7 @@ public sealed class SinalService(
         if (totem.Status != StatusTotem.Ativo) return new ResultadoSinal(ResultadoSinalTipo.TotemInativo);
 
         // 3) Grava o sinal. O UNIQUE de CHAVE_IDEMPOTENCIA protege contra dois envios simultâneos.
-        var agora = relogio.GetUtcNow().UtcDateTime;
+        var agora = relogio.AgoraParaOBanco();
         var sinal = new SinalTotem
         {
             TotemId = totem.Id,

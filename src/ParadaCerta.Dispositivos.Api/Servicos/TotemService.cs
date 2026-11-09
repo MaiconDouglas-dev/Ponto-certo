@@ -75,7 +75,7 @@ public sealed partial class TotemService(
             ParadaId = parada.Id,
             TokenHash = HashSegredo.Calcular(segredo),
             Status = StatusTotem.Ativo,
-            CriadoEm = relogio.GetUtcNow().UtcDateTime
+            CriadoEm = relogio.AgoraParaOBanco()
         };
         db.Totens.Add(totem);
         await db.SaveChangesAsync(ct);
