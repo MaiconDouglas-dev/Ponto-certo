@@ -1,17 +1,21 @@
-# Dependências da API Dispositivos para desenvolvimento local.
-#   docker compose up -d            -> Oracle, RabbitMQ e MongoDB (a API roda pelo VSCode)
-#   docker compose --profile api up -d --build  -> também sobe a API em container
+# Parada Certa - API Dispositivos: ambiente completo em containers.
+#
+#   docker compose up -d --build                      -> tudo: Oracle, RabbitMQ, MongoDB e a API (porta 5117)
+#   docker compose up -d oracle rabbitmq mongodb      -> só as dependências (a API roda pelo VSCode, porta 5117)
+#
+# Só precisa do Docker. Funciona sem o arquivo .env: os valores abaixo depois de ":-" são os padrões
+# de DESENVOLVIMENTO LOCAL. Para trocá-los (ou trocar uma porta ocupada), copie .env.example para .env.
 name: parada-certa
 
 services:
   oracle:
     image: gvenzl/oracle-free:23-slim-faststart
     environment:
-      ORACLE_PASSWORD: ${ORACLE_SYS_PASSWORD}
-      APP_USER: ${ORACLE_APP_USER}
-      APP_USER_PASSWORD: ${ORACLE_APP_PASSWORD}
+      ORACLE_PASSWORD: ${ORACLE_SYS_PASSWORD:-oracle_dev}
+      APP_USER: ${ORACLE_APP_USER:-parada}
+      APP_USER_PASSWORD: ${ORACLE_APP_PASSWORD:-parada_dev}
     ports:
-      - "1521:1521"
+      - "${ORACLE_PORTA:-1521}:1521"
     volumes:
       - oracle-dados:/opt/oracle/oradata
       - ./db/init:/container-entrypoint-initdb.d:ro
@@ -20,17 +24,17 @@ services:
       test: ["CMD", "healthcheck.sh"]
       interval: 10s
       timeout: 5s
-      retries: 30
+      retries: 60
       start_period: 30s
 
   rabbitmq:
     image: rabbitmq:4.1-management
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-parada}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-parada_dev}
     ports:
-      - "5672:5672"     # AMQP
-      - "15672:15672"   # painel: http://localhost:15672
+      - "${RABBITMQ_PORTA:-5672}:5672"             # AMQP
+      - "${RABBITMQ_PAINEL_PORTA:-15672}:15672"    # painel: http://localhost:15672
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -40,10 +44,10 @@ services:
   mongodb:
     image: mongo:8.2
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-parada}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-parada_dev}
     ports:
-      - "27018:27017"   # 27018 no host para não conflitar com um MongoDB local
+      - "${MONGO_PORTA:-27018}:27017"   # 27018 no host para não conflitar com um MongoDB local
     volumes:
       - mongo-dados:/data/db
     healthcheck:
@@ -53,19 +57,20 @@ services:
       retries: 10
 
   api:
-    profiles: ["api"]
     build: .
     ports:
-      - "8080:8080"
+      # 5117 no host (a mesma porta de quando roda pelo VSCode); 8080 costuma estar ocupada pela API Java.
+      - "${API_PORTA:-5117}:8080"     # Swagger: http://localhost:5117/swagger
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Oracle: "User Id=${ORACLE_APP_USER};Password=${ORACLE_APP_PASSWORD};Data Source=oracle:1521/FREEPDB1"
-      ConnectionStrings__MongoDb: "mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/?authSource=admin"
+      ConnectionStrings__Oracle: "User Id=${ORACLE_APP_USER:-parada};Password=${ORACLE_APP_PASSWORD:-parada_dev};Data Source=oracle:1521/FREEPDB1"
+      ConnectionStrings__MongoDb: "mongodb://${MONGO_USER:-parada}:${MONGO_PASSWORD:-parada_dev}@mongodb:27017/?authSource=admin"
       RabbitMq__HostName: rabbitmq
-      RabbitMq__Usuario: ${RABBITMQ_USER}
-      RabbitMq__Senha: ${RABBITMQ_PASSWORD}
-      Jwt__Chave: ${JWT_CHAVE}
-      Cartao__ChaveHmac: ${CARTAO_CHAVE_HMAC}
+      RabbitMq__Usuario: ${RABBITMQ_USER:-parada}
+      RabbitMq__Senha: ${RABBITMQ_PASSWORD:-parada_dev}
+      Jwt__Chave: ${JWT_CHAVE:-dev-somente-local-troque-em-producao-0123456789}
+      Cartao__ChaveHmac: ${CARTAO_CHAVE_HMAC:-dev-somente-local-hmac-cartao-0123456789abcdef}
+    restart: unless-stopped
     depends_on:
       oracle: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }

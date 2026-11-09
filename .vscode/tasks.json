@@ -28,11 +28,17 @@
     {
       "label": "docker: subir dependências",
       "type": "shell",
-      "command": "docker compose up -d",
+      "command": "docker compose up -d oracle rabbitmq mongodb",
       "problemMatcher": []
     },
     {
-      "label": "docker: derrubar dependências",
+      "label": "docker: subir tudo (com a API)",
+      "type": "shell",
+      "command": "docker compose up -d --build",
+      "problemMatcher": []
+    },
+    {
+      "label": "docker: derrubar tudo",
       "type": "shell",
       "command": "docker compose down",
       "problemMatcher": []
