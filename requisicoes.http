@@ -1,0 +1,67 @@
+### Parada Certa - API Dispositivos
+### Use com a extensão REST Client (humao.rest-client): clique em "Send Request" acima de cada bloco.
+### Credenciais do seed de desenvolvimento (db/scripts/02-seed-dev.sql).
+
+@baseUrl = http://localhost:5117
+
+### 1) Login do totem
+# @name loginTotem
+POST {{baseUrl}}/api/auth/dispositivo
+Content-Type: application/json
+
+{ "identificador": "TOTEM-0001", "segredo": "segredo-dev-totem-0001" }
+
+### 2) Sinal de cartão (troque a Idempotency-Key para criar um novo; repita a mesma para ver o 200)
+POST {{baseUrl}}/api/sinais
+Authorization: Bearer {{loginTotem.response.body.accessToken}}
+Idempotency-Key: TOTEM-0001-000001
+Content-Type: application/json
+
+{ "totemId": "TOTEM-0001", "tipo": "CARTAO", "uidCartao": "04A1B2C3D4", "dataHora": "2026-11-18T14:32:05-03:00" }
+
+### 3) Sinal de botão
+POST {{baseUrl}}/api/sinais
+Authorization: Bearer {{loginTotem.response.body.accessToken}}
+Idempotency-Key: TOTEM-0001-000002
+Content-Type: application/json
+
+{ "totemId": "TOTEM-0001", "tipo": "BOTAO", "dataHora": "2026-11-18T14:33:00-03:00" }
+
+### 4) Heartbeat
+POST {{baseUrl}}/api/heartbeats
+Authorization: Bearer {{loginTotem.response.body.accessToken}}
+Content-Type: application/json
+
+{ "rssiDbm": -61, "firmwareVersao": "1.0.0", "uptimeSegundos": 3600 }
+
+### 5) Login do gestor
+# @name loginGestor
+POST {{baseUrl}}/api/auth/gestor
+Content-Type: application/json
+
+{ "email": "gestor@paradacerta.dev", "senha": "Gestor@123" }
+
+### 6) Listar totens
+GET {{baseUrl}}/api/totens
+Authorization: Bearer {{loginGestor.response.body.accessToken}}
+
+### 7) Estado de um totem (online/offline, último sinal e heartbeat)
+GET {{baseUrl}}/api/totens/1
+Authorization: Bearer {{loginGestor.response.body.accessToken}}
+
+### 8) Cadastrar totem (o segredo aparece só nesta resposta)
+POST {{baseUrl}}/api/totens
+Authorization: Bearer {{loginGestor.response.body.accessToken}}
+Content-Type: application/json
+
+{ "identificador": "TOTEM-0002", "paradaId": 1 }
+
+### 9) Desativar totem
+PATCH {{baseUrl}}/api/totens/1/status
+Authorization: Bearer {{loginGestor.response.body.accessToken}}
+Content-Type: application/json
+
+{ "status": "INATIVO" }
+
+### 10) Health checks
+GET {{baseUrl}}/health
