@@ -119,22 +119,33 @@ cadastrar passageiros, cartões, linhas e veículos, e as telas do app.
 | Autenticação e autorização com JWT | 20 | `Seguranca/`, políticas `SomenteDispositivo` e `SomenteGestor` |
 | Tratamento de requisições repetidas (idempotência) | 15 | `Servicos/SinalService.cs` + UNIQUE em `SINAL_TOTEM.CHAVE_IDEMPOTENCIA` |
 | Rate limiting com 429 | 15 | `Configuracao/LimiteRequisicoes.cs` |
-| Testes xUnit (unidade e integração) | 20 | `tests/ParadaCerta.Dispositivos.Tests` (65 testes) |
+| Testes xUnit (unidade e integração) | 20 | `tests/ParadaCerta.Dispositivos.Tests` (66 testes) |
 | Health checks da API, banco e serviços externos | 10 | `/health`, `/health/live`, `/health/ready` |
 
 ## 6. Pré-requisitos
 
-| Ferramenta | Versão | Como verificar |
+Existem dois jeitos de rodar. **Para só usar ou avaliar a API, basta o Docker**: não é preciso instalar .NET,
+Oracle, RabbitMQ nem MongoDB.
+
+| Jeito | Precisa de | Para quem |
 | --- | --- | --- |
-| .NET SDK | 10.0 ou superior | `dotnet --version` |
-| Docker Desktop | qualquer versão recente | `docker --version` e `docker compose version` |
-| VSCode | qualquer versão recente | — |
-| Git | qualquer versão recente | `git --version` |
+| **A. Só Docker** (seção 7) | Docker Desktop (ou Docker Engine no Linux) e Git | Qualquer pessoa: professor, colegas, demonstração |
+| **B. Desenvolvimento** (seção 7.7) | Docker + .NET SDK 10 + VSCode | Quem vai alterar o código |
 
-Extensões do VSCode (o próprio VSCode sugere ao abrir a pasta, pelo `.vscode/extensions.json`):
-**C# Dev Kit**, **C#**, **Container Tools**, **REST Client** e **EditorConfig**.
+**Requisitos da máquina:**
 
-> Não é preciso instalar Oracle, RabbitMQ nem MongoDB: tudo roda em containers pelo `docker-compose.yml`.
+| Item | Mínimo |
+| --- | --- |
+| Sistema | Windows 10/11 (Docker Desktop com WSL 2), macOS (Intel ou Apple Silicon) ou Linux (x64 ou ARM64) |
+| Memória | 8 GB de RAM no computador (os containers usam cerca de 3 GB, sendo o Oracle o maior) |
+| Disco | cerca de 5 GB livres para as imagens |
+| Portas livres | 5117 (API), 1521 (Oracle), 5672 e 15672 (RabbitMQ), 27018 (MongoDB); todas podem ser trocadas (seção 16) |
+
+Para conferir se o Docker está instalado e funcionando:
+
+```bash
+docker compose version
+```
 
 ## 7. Como rodar (passo a passo)
 
@@ -148,70 +159,51 @@ git clone https://github.com/MaiconDouglas-dev/Ponto-certo.git
 cd Ponto-certo
 ```
 
-### 7.2 Criar os arquivos de configuração local
+### 7.2 Subir tudo com um comando
 
-Os arquivos reais são ignorados pelo Git. Copie os exemplos (eles já vêm com valores para o ambiente local):
-
-```bash
-cp .env.example .env
-```
+Com o Docker Desktop **aberto**:
 
 ```bash
-cp src/ParadaCerta.Dispositivos.Api/appsettings.Development.example.json src/ParadaCerta.Dispositivos.Api/appsettings.Development.json
+docker compose up -d --build
 ```
 
-### 7.3 Subir as dependências (Oracle, RabbitMQ e MongoDB)
+Esse comando, sem nenhuma configuração extra:
+1. baixa as imagens do Oracle, RabbitMQ e MongoDB (só na primeira vez, alguns minutos);
+2. compila a API dentro de um container (não precisa de .NET instalado);
+3. cria as tabelas (`db/scripts/01-ddl.sql`) e os dados de teste (`db/scripts/02-seed-dev.sql`);
+4. só inicia a API depois que Oracle, RabbitMQ e MongoDB estão prontos.
 
-```bash
-docker compose up -d
-```
+> Não é preciso criar o arquivo `.env`: o `docker-compose.yml` já tem valores padrão para o ambiente local.
+> Copie `.env.example` para `.env` só se quiser trocar uma senha ou uma porta.
 
-Na primeira vez, o Oracle leva alguns minutos. Acompanhe até os três serviços aparecerem como `healthy`:
+Acompanhe até os quatro serviços aparecerem como `running` (e os três de infraestrutura como `healthy`):
 
 ```bash
 docker compose ps
 ```
 
-Na primeira subida, o container do Oracle executa automaticamente:
-- `db/scripts/01-ddl.sql`: cria as tabelas do grupo;
-- `db/scripts/02-seed-dev.sql`: cria dados de teste (uma parada, um totem e um gestor).
+### 7.3 Conferir se está funcionando
 
-| Serviço | Endereço no seu computador |
+Abra no navegador: <http://localhost:5117/health>. O resultado deve ser `"status": "Healthy"`, com os quatro itens
+(`api`, `oracle`, `rabbitmq`, `mongodb`) também `Healthy`.
+
+| O quê | Endereço |
 | --- | --- |
-| Oracle | `localhost:1521`, serviço `FREEPDB1` |
-| RabbitMQ (AMQP) | `localhost:5672` |
-| RabbitMQ (painel) | <http://localhost:15672> (usuário e senha do `.env`) |
-| MongoDB | `localhost:27018` (27018 para não conflitar com um MongoDB instalado na máquina) |
+| **Swagger (documentação interativa)** | <http://localhost:5117/swagger> |
+| Health check | <http://localhost:5117/health> |
+| Painel do RabbitMQ | <http://localhost:15672> (usuário `parada`, senha `parada_dev`) |
+| Oracle | `localhost:1521`, serviço `FREEPDB1`, usuário `parada`, senha `parada_dev` |
+| MongoDB | `mongodb://parada:parada_dev@localhost:27018/?authSource=admin` |
 
-### 7.4 Rodar a API
+Depois, siga a seção 8 para testar as rotas.
 
-**Pelo VSCode:** pressione **F5** (configuração *API Dispositivos*). Ele compila, sobe a API e abre o Swagger.
-
-**Pelo terminal:**
-
-```bash
-dotnet run --project src/ParadaCerta.Dispositivos.Api
-```
-
-A API fica em <http://localhost:5117>, e o Swagger em <http://localhost:5117/swagger>.
-
-### 7.5 Conferir se está tudo de pé
+### 7.4 Ver os logs
 
 ```bash
-curl http://localhost:5117/health
+docker compose logs -f api
 ```
 
-Os quatro itens (`api`, `oracle`, `rabbitmq`, `mongodb`) devem aparecer como `Healthy`.
-
-### 7.6 Alternativa: API também em container
-
-```bash
-docker compose --profile api up -d --build
-```
-
-Nesse modo, a API fica em <http://localhost:8080>.
-
-### 7.7 Desligar
+### 7.5 Desligar
 
 ```bash
 docker compose down
@@ -223,10 +215,47 @@ Para **apagar os dados** e recriar o banco do zero na próxima subida:
 docker compose down -v
 ```
 
-### 7.8 Tarefas prontas no VSCode
+### 7.6 Atualizar depois de um `git pull`
 
-Em *Terminal → Run Task*: `build`, `test`, `watch` (recompila ao salvar), `docker: subir dependências` e
-`docker: derrubar dependências`.
+```bash
+docker compose up -d --build
+```
+
+### 7.7 Modo desenvolvimento (VSCode)
+
+Para alterar o código, rode a API fora do container e só as dependências no Docker.
+
+1. Instale o **.NET SDK 10** (confira com `dotnet --version`) e o **VSCode**. Ao abrir a pasta, aceite as
+   extensões recomendadas: C# Dev Kit, C#, Container Tools, REST Client e EditorConfig.
+2. Crie a configuração local da API (o arquivo real é ignorado pelo Git):
+
+   ```bash
+   cp src/ParadaCerta.Dispositivos.Api/appsettings.Development.example.json src/ParadaCerta.Dispositivos.Api/appsettings.Development.json
+   ```
+
+3. Se a API em container estiver rodando, pare-a para liberar a porta 5117:
+
+   ```bash
+   docker compose stop api
+   ```
+
+4. Suba só as dependências:
+
+   ```bash
+   docker compose up -d oracle rabbitmq mongodb
+   ```
+
+5. Pressione **F5** no VSCode (configuração *API Dispositivos*), ou rode:
+
+   ```bash
+   dotnet run --project src/ParadaCerta.Dispositivos.Api
+   ```
+
+A API fica no mesmo endereço, <http://localhost:5117>, então o `requisicoes.http` e o Swagger funcionam igual
+nos dois modos.
+
+Tarefas prontas em *Terminal → Run Task*: `build`, `test`, `watch` (recompila ao salvar),
+`docker: subir dependências`, `docker: subir tudo (com a API)` e `docker: derrubar tudo`.
 
 ## 8. Como testar a API
 
@@ -237,10 +266,13 @@ Em *Terminal → Run Task*: `build`, `test`, `watch` (recompila ao salvar), `doc
 | Gestor | `gestor@paradacerta.dev` | `Gestor@123` |
 | Totem | `TOTEM-0001` | `segredo-dev-totem-0001` |
 
+Esses dados são criados pelo `02-seed-dev.sql` e servem só para o ambiente local.
+
 ### 8.2 Pelo arquivo `requisicoes.http` (recomendado)
 
-Abra `requisicoes.http` no VSCode e clique em **Send Request** acima de cada bloco, na ordem. O token do login
-é reaproveitado automaticamente nos blocos seguintes.
+Abra `requisicoes.http` no VSCode (com a extensão REST Client) e clique em **Send Request** acima de cada bloco,
+na ordem. O token do login é reaproveitado automaticamente nos blocos seguintes. Funciona tanto com a API no
+container quanto rodando pelo VSCode.
 
 ### 8.3 Pelo Swagger
 
@@ -264,13 +296,49 @@ Abra `requisicoes.http` no VSCode e clique em **Send Request** acima de cada blo
 | 8 | `GET /health` | API, Oracle, RabbitMQ e MongoDB `Healthy` |
 | 9 | Painel do RabbitMQ, fila `sinal-totem` | uma mensagem por sinal novo |
 
+> Reenvios (200) e conflitos (409) também contam para o limite de 10 por minuto, porque cada um é uma requisição.
+
+### 8.5 Conferir os dados gravados
+
+Oracle, tabela `SINAL_TOTEM` (um registro por sinal novo; reenvios não criam linha):
+
+```bash
+echo "SELECT id, chave_idempotencia, tipo, recebido_em FROM sinal_totem ORDER BY id;" | docker compose exec -T oracle sqlplus -s parada/parada_dev@localhost/FREEPDB1
+```
+
+RabbitMQ, quantidade de mensagens na fila `sinal-totem`:
+
+```bash
+docker compose exec rabbitmq rabbitmqctl list_queues name messages
+```
+
+MongoDB, eventos por tipo (`SINAL_RECEBIDO`, `SINAL_REPETIDO`, `HEARTBEAT`):
+
+```bash
+docker compose exec mongodb mongosh -u parada -p parada_dev --quiet --eval 'db.getSiblingDB("parada_certa").eventos_totem.aggregate([{$group:{_id:"$tipo",total:{$sum:1}}}]).toArray()'
+```
+
+### 8.6 Testar a resiliência (derrubando serviços)
+
+| Comando | Depois, faça | Esperado |
+| --- | --- | --- |
+| `docker compose stop rabbitmq` | Envie um sinal | **503**, e nada é gravado no Oracle. Religue com `docker compose start rabbitmq` e reenvie com **a mesma chave**: **201** |
+| `docker compose stop mongodb` | Envie um sinal | **201** (o MongoDB não é caminho crítico); `/health` responde **503** com `mongodb` `Unhealthy` |
+| `docker compose stop oracle` | Faça login | **503** + `Retry-After: 15` (nunca 500) |
+
+Para religar tudo:
+
+```bash
+docker compose start
+```
+
 ## 9. Testes automatizados
 
 ```bash
 dotnet test
 ```
 
-- **65 testes** de unidade e de integração.
+- **66 testes** de unidade e de integração.
 - **Não precisam de Docker:** o Oracle é trocado por SQLite em memória (que respeita o índice UNIQUE da
   idempotência), e o RabbitMQ e o MongoDB por implementações falsas.
 - Autenticação, autorização, rate limiting, validação e serialização são **os reais** da aplicação.
@@ -477,8 +545,12 @@ Passos para publicar (Azure App Service for Containers, Render ou similar):
 
 | Sintoma | Causa e solução |
 | --- | --- |
-| A API não sobe e reclama de `Jwt:Chave` ou `Cartao:ChaveHmac` | Falta o `appsettings.Development.json` (passo 7.2) ou a chave tem menos de 32 caracteres. |
+| `Cannot connect to the Docker daemon` | O Docker Desktop não está aberto. Abra e espere o ícone ficar verde. |
+| `port is already allocated` / `address already in use` | Outra aplicação usa a porta. Copie `.env.example` para `.env` e troque a porta (`API_PORTA`, `ORACLE_PORTA`, `RABBITMQ_PORTA`, `RABBITMQ_PAINEL_PORTA` ou `MONGO_PORTA`); depois rode `docker compose up -d` de novo. |
+| Pelo VSCode, a API não sobe e reclama de `Jwt:Chave` ou `Cartao:ChaveHmac` | Falta o `appsettings.Development.json` (seção 7.7, passo 2) ou a chave tem menos de 32 caracteres. |
 | `/health` mostra `oracle` como `Unhealthy` | O Oracle ainda está iniciando. Espere o `docker compose ps` mostrar `healthy`. |
+| No Windows, o Oracle sobe mas as tabelas não existem | O script de inicialização foi salvo com fim de linha do Windows. O `.gitattributes` evita isso em clones novos; se acontecer, clone de novo e rode `docker compose down -v` antes de subir. |
+| O computador fica lento | O Oracle usa cerca de 2 GB de RAM. No Docker Desktop, deixe pelo menos 4 GB em *Settings → Resources*. |
 | Login ou sinal respondem **503** | Alguma dependência está fora do ar. Veja `/health` e `docker compose ps`. |
 | MongoDB não conecta | Outro MongoDB está usando a porta 27017. O compose usa **27018** no host; confira a connection string. |
 | O container do MongoDB não inicia em Linux com kernel 6.19+ | Incompatibilidade conhecida do `mongo:8.0`. O projeto usa `mongo:8.2`. |
