@@ -1,0 +1,10 @@
+# Normaliza fins de linha. Os scripts executados dentro dos containers Linux precisam de LF,
+# mesmo quando o repositório é clonado no Windows (core.autocrlf=true quebraria o bash e o sqlplus).
+* text=auto
+*.sh text eol=lf
+*.sql text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+
+*.pdf binary
+*.png binary
