@@ -1,0 +1,13 @@
+{
+  "dotnet.defaultSolution": "ParadaCerta.Dispositivos.sln",
+  "editor.formatOnSave": true,
+  "files.exclude": {
+    "**/bin": true,
+    "**/obj": true
+  },
+  "rest-client.environmentVariables": {
+    "local": {
+      "baseUrl": "http://localhost:5117"
+    }
+  }
+}
