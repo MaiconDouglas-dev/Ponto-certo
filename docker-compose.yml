@@ -1,0 +1,76 @@
+# Dependências da API Dispositivos para desenvolvimento local.
+#   docker compose up -d            -> Oracle, RabbitMQ e MongoDB (a API roda pelo VSCode)
+#   docker compose --profile api up -d --build  -> também sobe a API em container
+name: parada-certa
+
+services:
+  oracle:
+    image: gvenzl/oracle-free:23-slim-faststart
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_SYS_PASSWORD}
+      APP_USER: ${ORACLE_APP_USER}
+      APP_USER_PASSWORD: ${ORACLE_APP_PASSWORD}
+    ports:
+      - "1521:1521"
+    volumes:
+      - oracle-dados:/opt/oracle/oradata
+      - ./db/init:/container-entrypoint-initdb.d:ro
+      - ./db/scripts:/opt/parada-certa/scripts:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # painel: http://localhost:15672
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mongodb:
+    image: mongo:8.2
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    ports:
+      - "27018:27017"   # 27018 no host para não conflitar com um MongoDB local
+    volumes:
+      - mongo-dados:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    profiles: ["api"]
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Oracle: "User Id=${ORACLE_APP_USER};Password=${ORACLE_APP_PASSWORD};Data Source=oracle:1521/FREEPDB1"
+      ConnectionStrings__MongoDb: "mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/?authSource=admin"
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Usuario: ${RABBITMQ_USER}
+      RabbitMq__Senha: ${RABBITMQ_PASSWORD}
+      Jwt__Chave: ${JWT_CHAVE}
+      Cartao__ChaveHmac: ${CARTAO_CHAVE_HMAC}
+    depends_on:
+      oracle: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      mongodb: { condition: service_healthy }
+
+volumes:
+  oracle-dados:
+  mongo-dados:
