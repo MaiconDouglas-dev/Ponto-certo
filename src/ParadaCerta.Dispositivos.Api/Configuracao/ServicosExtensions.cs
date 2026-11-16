@@ -128,6 +128,7 @@ public static class ServicosExtensions
             .AddPolicy(Politicas.Gestor, p => p.RequireRole(Perfis.Gestor));
 
         services.AddSingleton<IHashCartao, HashCartao>();
+        services.AddSingleton<IHashSegredo, HashSegredo>();
         services.AddSingleton<TokenService>();
         return services;
     }

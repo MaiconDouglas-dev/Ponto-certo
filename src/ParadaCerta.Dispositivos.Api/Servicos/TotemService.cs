@@ -16,6 +16,7 @@ public sealed record ResultadoTotem<T>(ResultadoTotemTipo Tipo, T? Valor = defau
 public sealed partial class TotemService(
     ParadaCertaDbContext db,
     IRegistroEventos eventos,
+    IHashSegredo hashSegredo,
     TimeProvider relogio,
     ILogger<TotemService> logger)
 {
@@ -73,7 +74,7 @@ public sealed partial class TotemService(
         {
             Identificador = identificador,
             ParadaId = parada.Id,
-            TokenHash = HashSegredo.Calcular(segredo),
+            TokenHash = hashSegredo.Calcular(segredo),
             Status = StatusTotem.Ativo,
             CriadoEm = relogio.AgoraParaOBanco()
         };
@@ -105,7 +106,7 @@ public sealed partial class TotemService(
         if (totem is null) return new ResultadoTotem<TotemComSegredoResponse>(ResultadoTotemTipo.NaoEncontrado);
 
         var segredo = HashSegredo.GerarSegredo();
-        totem.TokenHash = HashSegredo.Calcular(segredo);
+        totem.TokenHash = hashSegredo.Calcular(segredo);
         await db.SaveChangesAsync(ct);
         return new ResultadoTotem<TotemComSegredoResponse>(ResultadoTotemTipo.Ok, new(ParaResposta(totem), segredo));
     }

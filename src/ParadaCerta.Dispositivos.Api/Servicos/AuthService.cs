@@ -6,7 +6,7 @@ using ParadaCerta.Dispositivos.Api.Seguranca;
 
 namespace ParadaCerta.Dispositivos.Api.Servicos;
 
-public sealed class AuthService(ParadaCertaDbContext db, TokenService tokens)
+public sealed class AuthService(ParadaCertaDbContext db, TokenService tokens, IHashSegredo hashSegredo)
 {
     /// <summary>Troca identificador + segredo do totem por um JWT de perfil DISPOSITIVO.</summary>
     public async Task<TokenResponse?> LoginDispositivoAsync(LoginDispositivoRequest request, CancellationToken ct)
@@ -18,7 +18,7 @@ public sealed class AuthService(ParadaCertaDbContext db, TokenService tokens)
         var totem = await db.Totens.AsNoTracking().FirstOrDefaultAsync(t => t.Identificador == identificador, ct);
 
         if (totem is null || totem.Status != StatusTotem.Ativo) return null;
-        if (!HashSegredo.Confere(request.Segredo, totem.TokenHash)) return null;
+        if (!hashSegredo.Confere(request.Segredo, totem.TokenHash)) return null;
 
         return tokens.GerarParaDispositivo(totem);
     }

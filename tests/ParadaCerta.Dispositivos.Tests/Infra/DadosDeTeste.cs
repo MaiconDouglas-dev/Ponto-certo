@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using ParadaCerta.Dispositivos.Api.Dados;
 using ParadaCerta.Dispositivos.Api.Dominio;
 using ParadaCerta.Dispositivos.Api.Seguranca;
@@ -39,7 +40,7 @@ public static class DadosDeTeste
     {
         Identificador = identificador,
         ParadaId = paradaId,
-        TokenHash = HashSegredo.Calcular(SegredoTotem),
+        TokenHash = new HashSegredo(Options.Create(new CartaoOptions { ChaveHmac = ChaveHmac })).Calcular(SegredoTotem),
         Status = status,
         CriadoEm = DateTime.UtcNow
     };

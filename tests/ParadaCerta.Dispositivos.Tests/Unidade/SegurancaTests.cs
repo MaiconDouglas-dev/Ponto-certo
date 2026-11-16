@@ -43,12 +43,39 @@ public class SegurancaTests
         Assert.Equal(ReferenciaHmac.Esperado, hash);
     }
 
+    private static HashSegredo CriarHashSegredo(string chave) =>
+        new(Options.Create(new CartaoOptions { ChaveHmac = chave }));
+
     [Fact]
     public void Segredo_do_totem_confere_so_com_o_valor_certo()
     {
-        var hash = HashSegredo.Calcular("meu-segredo");
-        Assert.True(HashSegredo.Confere("meu-segredo", hash));
-        Assert.False(HashSegredo.Confere("outro-segredo", hash));
+        var hashSegredo = CriarHashSegredo(DadosDeTeste.ChaveHmac);
+        var hash = hashSegredo.Calcular("meu-segredo");
+        Assert.True(hashSegredo.Confere("meu-segredo", hash));
+        Assert.False(hashSegredo.Confere("outro-segredo", hash));
+    }
+
+    [Fact]
+    public void Hash_do_segredo_do_totem_bate_com_o_da_api_java()
+    {
+        // A API Java grava TOKEN_HASH como HMAC-SHA256 com HASH_SECRET (a mesma chave do cartão).
+        var hash = CriarHashSegredo(DadosDeTeste.ChaveHmac).Calcular(DadosDeTeste.SegredoTotem);
+        Assert.Equal(ReferenciaHmac.SegredoTotemEsperado, hash);
+    }
+
+    [Fact]
+    public void Hash_do_segredo_do_totem_ignora_espacos_nas_pontas_como_o_java()
+    {
+        var hashSegredo = CriarHashSegredo(DadosDeTeste.ChaveHmac);
+        Assert.Equal(hashSegredo.Calcular("segredo-de-teste"), hashSegredo.Calcular("  segredo-de-teste "));
+    }
+
+    [Fact]
+    public void Hash_do_segredo_do_totem_muda_com_a_chave()
+    {
+        var a = CriarHashSegredo(DadosDeTeste.ChaveHmac).Calcular("meu-segredo");
+        var b = CriarHashSegredo("outra-chave-hmac-com-mais-de-32-caracteres!").Calcular("meu-segredo");
+        Assert.NotEqual(a, b);
     }
 
     [Fact]

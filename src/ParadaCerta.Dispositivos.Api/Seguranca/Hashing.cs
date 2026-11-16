@@ -35,14 +35,30 @@ public sealed class HashCartao(IOptions<CartaoOptions> opcoes) : IHashCartao
            .ToUpperInvariant();
 }
 
-public static class HashSegredo
+public interface IHashSegredo
 {
-    /// <summary>SHA-256 em hex minúsculo, formato da coluna TOTEM.TOKEN_HASH (CHAR(64)).</summary>
-    public static string Calcular(string segredo) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(segredo)));
+    /// <summary>HMAC-SHA256 do segredo do totem, em hex minúsculo (64 caracteres).</summary>
+    string Calcular(string segredo);
+
+    /// <summary>Confere o segredo enviado pelo totem com o hash gravado.</summary>
+    bool Confere(string segredo, string hashGravado);
+}
+
+/// <summary>
+/// Hash da coluna TOTEM.TOKEN_HASH, igual ao HashService da API Java:
+/// HMAC-SHA256 dos bytes UTF-8 do segredo sem espaços nas pontas, com a mesma chave do cartão
+/// (Cartao:ChaveHmac = HASH_SECRET do Java), em hex minúsculo. Assim um totem cadastrado
+/// por qualquer uma das duas APIs consegue entrar pela outra.
+/// </summary>
+public sealed class HashSegredo(IOptions<CartaoOptions> opcoes) : IHashSegredo
+{
+    private readonly byte[] _chave = Encoding.UTF8.GetBytes(opcoes.Value.ChaveHmac);
+
+    public string Calcular(string segredo) =>
+        Convert.ToHexStringLower(HMACSHA256.HashData(_chave, Encoding.UTF8.GetBytes(segredo.Trim())));
 
     /// <summary>Compara em tempo constante, para não vazar informação pelo tempo de resposta.</summary>
-    public static bool Confere(string segredo, string hashGravado)
+    public bool Confere(string segredo, string hashGravado)
     {
         var calculado = Encoding.ASCII.GetBytes(Calcular(segredo));
         var gravado = Encoding.ASCII.GetBytes(hashGravado.Trim());

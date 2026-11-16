@@ -7,7 +7,7 @@ public class Totem
     public long ParadaId { get; set; }
     public string Identificador { get; set; } = string.Empty;
 
-    /// <summary>SHA-256 (hex minúsculo) do segredo do dispositivo. O segredo puro nunca é gravado.</summary>
+    /// <summary>HMAC-SHA256 (hex minúsculo) do segredo do dispositivo, igual ao da API Java. O segredo puro nunca é gravado.</summary>
     public string TokenHash { get; set; } = string.Empty;
 
     public StatusTotem Status { get; set; } = StatusTotem.Ativo;
