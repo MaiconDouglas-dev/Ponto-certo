@@ -12,7 +12,7 @@ Parte .NET do projeto *Parada Certa*, da Global Solution 2026/2 (tema **CitizenT
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-4.1-FF6600?logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-8.2-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![Testes](https://img.shields.io/badge/xUnit-66_testes-5C2D91)](#-testes-automatizados)
+[![Testes](https://img.shields.io/badge/xUnit-69_testes-5C2D91)](#-testes-automatizados)
 
 [Início rápido](#-início-rápido) ·
 [Como funciona](#-como-funciona) ·
@@ -188,7 +188,8 @@ sequenceDiagram
    | Mesma chave, conteúdo diferente | **409 Conflict** | Nada muda |
 
 4. **Privacidade do cartão.** O UID nunca é gravado puro: a API grava um HMAC-SHA256 do UID com uma chave
-   secreta que a API Java também conhece. Assim a Java identifica o passageiro sem expor o UID.
+   secreta que a API Java também conhece. Assim a Java identifica o passageiro sem expor o UID. A mesma chave
+   gera o hash do segredo do totem, como na Java, então um totem cadastrado por qualquer uma das APIs entra pela outra.
 5. **Repasse confiável.** A API só responde 201 depois de o RabbitMQ **confirmar** que guardou a mensagem. Se a
    fila estiver fora do ar, a API desfaz a gravação e responde 503, para o totem reenviar com a mesma chave.
 6. **Heartbeat.** O totem chama `POST /api/heartbeats` periodicamente. Ele aparece como *online* se o último
@@ -204,7 +205,7 @@ sequenceDiagram
 | Autenticação e autorização com JWT | 20 | [`Seguranca/`](src/ParadaCerta.Dispositivos.Api/Seguranca), políticas `SomenteDispositivo` e `SomenteGestor` |
 | Tratamento de requisições repetidas (idempotência) | 15 | [`SinalService.cs`](src/ParadaCerta.Dispositivos.Api/Servicos/SinalService.cs) + UNIQUE em `SINAL_TOTEM.CHAVE_IDEMPOTENCIA` |
 | Rate limiting com resposta 429 | 15 | [`LimiteRequisicoes.cs`](src/ParadaCerta.Dispositivos.Api/Configuracao/LimiteRequisicoes.cs) |
-| Testes xUnit de unidade e integração | 20 | [`tests/`](tests/ParadaCerta.Dispositivos.Tests) · 66 testes |
+| Testes xUnit de unidade e integração | 20 | [`tests/`](tests/ParadaCerta.Dispositivos.Tests) · 69 testes |
 | Health checks da API, do banco e dos serviços externos | 10 | `/health`, `/health/live`, `/health/ready` |
 
 ## 🧰 Tecnologias
@@ -454,14 +455,14 @@ Requer o .NET SDK 10 (não precisa de Docker):
 dotnet test
 ```
 
-- **66 testes** de unidade e de integração.
+- **69 testes** de unidade e de integração.
 - O Oracle é trocado por **SQLite em memória**, que respeita o índice UNIQUE da idempotência. O RabbitMQ e o
   MongoDB são trocados por implementações falsas.
 - Autenticação, autorização, rate limiting, validação e serialização são **os reais** da aplicação.
 
 | Pasta | O que cobre |
 | --- | --- |
-| [`Unidade/`](tests/ParadaCerta.Dispositivos.Tests/Unidade) | Validação do sinal; hash do cartão (com valor de referência calculado fora do .NET); JWT; regras do `SinalService`; classificação de falha de dependência; precisão das datas |
+| [`Unidade/`](tests/ParadaCerta.Dispositivos.Tests/Unidade) | Validação do sinal; hash do cartão e do segredo do totem (com valores de referência calculados fora do .NET, iguais aos da Java); JWT; regras do `SinalService`; classificação de falha de dependência; precisão das datas |
 | [`Integracao/`](tests/ParadaCerta.Dispositivos.Tests/Integracao) | API completa: 201, 200 repetido, 400, 401, 403, 409, 429 e 503; fluxo do gestor; health checks; documento OpenAPI; datas em UTC; proxy reverso |
 
 ---
@@ -546,8 +547,24 @@ uid_hash = hex_minúsculo( HMAC-SHA256( chave = Cartao:ChaveHmac, mensagem = UTF
   `04A1B2C3D4` → `f2eb07590200c3b0cc629c26b51b3f681d1203a0edd18d675800e0b9c065e2c9`.
 
 > [!IMPORTANT]
-> As duas APIs precisam usar **a mesma chave HMAC** em cada ambiente. Caso contrário, o hash gravado pelo totem
-> nunca bate com o do cartão cadastrado pelo cuidador.
+> As duas APIs precisam usar **a mesma chave HMAC** em cada ambiente (`Cartao__ChaveHmac` aqui, `HASH_SECRET` na
+> Java). Caso contrário, o hash gravado pelo totem nunca bate com o do cartão cadastrado pelo cuidador, e um totem
+> cadastrado pela Java não consegue entrar nesta API.
+
+> [!WARNING]
+> No commit `c48a1ae` da API Java, o `HashService` só tira os espaços das pontas do UID, sem a normalização acima.
+> Um UID digitado como `04a1b2c3d4` ou `04:A1:B2:C3:D4` gera lá um hash diferente do daqui. A Java precisa
+> normalizar o UID antes do HMAC (ou validar que ele chega em hexadecimal maiúsculo, sem separadores).
+
+### Hash do segredo do totem (igual ao da API Java)
+
+```text
+token_hash = hex_minúsculo( HMAC-SHA256( chave = Cartao:ChaveHmac, mensagem = UTF-8(segredo sem espaços nas pontas) ) )
+```
+
+- É exatamente o que o `HashService` da Java grava em `TOTEM.TOKEN_HASH` (`citizentech.hash.secret` = `HASH_SECRET`).
+- **Valor de referência:** chave `chave-hmac-de-teste-com-mais-de-32-caracteres` e segredo `segredo-de-teste` →
+  `8bcd585d724888d5060d1a509df1430f8f2ec89ca5a78bb32afa76f5b27669a1`.
 
 ### Mensagem na fila `sinal-totem`
 
@@ -596,7 +613,7 @@ configure por variáveis de ambiente (o `__` separa as seções):
 | `ConnectionStrings__MongoDb` | ✅ | `mongodb+srv://...` (Atlas) |
 | `RabbitMq__Uri` | ✅ \* | `amqps://usuario:senha@host/vhost` (\* ou `RabbitMq__HostName`, `__Usuario` e `__Senha`) |
 | `Jwt__Chave` | ✅ | mínimo 32 caracteres; a API não sobe sem ela |
-| `Cartao__ChaveHmac` | ✅ | mínimo 32 caracteres, **igual à da API Java** |
+| `Cartao__ChaveHmac` | ✅ | mínimo 32 caracteres, **igual ao `HASH_SECRET` da API Java** (hash do cartão e do segredo do totem) |
 | `ProxyReverso__Habilitado` | — | `true` só atrás do proxy da nuvem (veja abaixo); padrão `false` |
 | `LimiteRequisicoes__Sinais__Limite` | — | padrão `10` (há o mesmo para `Heartbeat` e `Login`) |
 
@@ -685,7 +702,7 @@ Para publicar (Azure App Service for Containers, Render ou similar):
 | **Publicação com confirmação do broker** | A API só responde 201 depois de o RabbitMQ confirmar que guardou a mensagem. Se falhar, desfaz a gravação e responde 503. |
 | **MongoDB só para telemetria** | Se o MongoDB cair, o sinal continua valendo: ele não é caminho crítico. |
 | **Dependência fora do ar vira 503** | O cliente sabe que pode tentar de novo (`Retry-After`), em vez de receber um 500 genérico. |
-| **UID do cartão em HMAC, segredo do totem em SHA-256** | Nada que identifique o passageiro ou dê acesso ao totem fica gravado em texto puro. |
+| **UID do cartão e segredo do totem em HMAC-SHA256** | Nada que identifique o passageiro ou dê acesso ao totem fica gravado em texto puro, e o formato é o mesmo da API Java, com a mesma chave. |
 | **Problem Details em todos os erros** | Formato padrão (RFC 9457), fácil de tratar no firmware, no app e na API Java. |
 
 ## 🩺 Problemas comuns
@@ -722,7 +739,9 @@ Para publicar (Azure App Service for Containers, Render ou similar):
 
 ### Combinar com o grupo
 
-- [ ] **Chave HMAC do cartão:** a mesma na API .NET e na API Java em cada ambiente; testar com o [valor de referência](#hash-do-cartão-a-api-java-precisa-calcular-igual).
+- [ ] **Chave HMAC:** a mesma na API .NET (`Cartao__ChaveHmac`) e na API Java (`HASH_SECRET`) em cada ambiente; testar com os [valores de referência](#hash-do-cartão-a-api-java-precisa-calcular-igual). Não gerar o `HASH_SECRET` aleatório a cada execução, como sugere o README do app.
+- [ ] **UID do cartão na Java:** normalizar (sem espaços, `:` e `-`, em maiúsculas) antes do HMAC, como esta API faz.
+- [ ] **Banco da Java na demonstração:** o perfil `dev` usa H2 em memória; para o fluxo completo a Java precisa usar o mesmo Oracle desta API.
 - [ ] **Contrato da fila `sinal-totem`:** validar com quem faz o consumidor Java.
 - [ ] **Firmware do totem:** gerar a `Idempotency-Key` uma vez por acionamento e reutilizá-la nos reenvios; tratar 401 (refazer o login), 429 e 503 (esperar o `Retry-After`).
 - [ ] **App Mobile:** definir se alguma tela usa esta API (por exemplo, a gestão de totens pelo gestor).
