@@ -56,6 +56,16 @@ public class SegurancaTests
     }
 
     [Fact]
+    public void Segredo_do_totem_confere_com_hash_gravado_em_maiusculas()
+    {
+        // O script do banco grava hashes com RAWTOHEX, que devolve hex em maiúsculas.
+        var hashSegredo = CriarHashSegredo(DadosDeTeste.ChaveHmac);
+        var hash = hashSegredo.Calcular("meu-segredo").ToUpperInvariant();
+        Assert.True(hashSegredo.Confere("meu-segredo", hash));
+        Assert.False(hashSegredo.Confere("outro-segredo", hash));
+    }
+
+    [Fact]
     public void Hash_do_segredo_do_totem_bate_com_o_da_api_java()
     {
         // A API Java grava TOKEN_HASH como HMAC-SHA256 com HASH_SECRET (a mesma chave do cartão).

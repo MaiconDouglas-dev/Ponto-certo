@@ -12,7 +12,7 @@ Parte .NET do projeto *Parada Certa*, da Global Solution 2026/2 (tema **CitizenT
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-4.1-FF6600?logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-8.2-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![Testes](https://img.shields.io/badge/xUnit-69_testes-5C2D91)](#-testes-automatizados)
+[![Testes](https://img.shields.io/badge/xUnit-70_testes-5C2D91)](#-testes-automatizados)
 
 [Início rápido](#-início-rápido) ·
 [Como funciona](#-como-funciona) ·
@@ -205,7 +205,7 @@ sequenceDiagram
 | Autenticação e autorização com JWT | 20 | [`Seguranca/`](src/ParadaCerta.Dispositivos.Api/Seguranca), políticas `SomenteDispositivo` e `SomenteGestor` |
 | Tratamento de requisições repetidas (idempotência) | 15 | [`SinalService.cs`](src/ParadaCerta.Dispositivos.Api/Servicos/SinalService.cs) + UNIQUE em `SINAL_TOTEM.CHAVE_IDEMPOTENCIA` |
 | Rate limiting com resposta 429 | 15 | [`LimiteRequisicoes.cs`](src/ParadaCerta.Dispositivos.Api/Configuracao/LimiteRequisicoes.cs) |
-| Testes xUnit de unidade e integração | 20 | [`tests/`](tests/ParadaCerta.Dispositivos.Tests) · 69 testes |
+| Testes xUnit de unidade e integração | 20 | [`tests/`](tests/ParadaCerta.Dispositivos.Tests) · 70 testes |
 | Health checks da API, do banco e dos serviços externos | 10 | `/health`, `/health/live`, `/health/ready` |
 
 ## 🧰 Tecnologias
@@ -455,7 +455,7 @@ Requer o .NET SDK 10 (não precisa de Docker):
 dotnet test
 ```
 
-- **69 testes** de unidade e de integração.
+- **70 testes** de unidade e de integração.
 - O Oracle é trocado por **SQLite em memória**, que respeita o índice UNIQUE da idempotência. O RabbitMQ e o
   MongoDB são trocados por implementações falsas.
 - Autenticação, autorização, rate limiting, validação e serialização são **os reais** da aplicação.
@@ -586,12 +586,25 @@ Fila durável e sem argumentos extras. A mensagem é persistente, com `content-t
 ```
 
 A Java usa `chaveIdempotencia` como `SOLICITACAO_EMBARQUE.CHAVE_IDEMPOTENCIA` e, depois de criar a solicitação,
-preenche `SINAL_TOTEM.SOLICITACAO_ID`. Todas as datas gravadas pela API .NET estão em **UTC**.
+preenche `SINAL_TOTEM.SOLICITACAO_EMBARQUE_ID`. Todas as datas gravadas pela API .NET estão em **UTC**.
 
 ### Banco de dados
 
-As tabelas vêm do script do grupo, [`db/scripts/01-ddl.sql`](db/scripts/01-ddl.sql). Não há migrations do
-EF Core: mudanças de tabela são feitas no DDL e combinadas com o grupo.
+As tabelas vêm do script oficial da disciplina de Banco de Dados (`ScriptsOracle.sql`): o
+[`db/scripts/01-ddl.sql`](db/scripts/01-ddl.sql) é uma cópia fiel da parte de criação de tabelas e índices dele.
+Não há migrations do EF Core: mudanças de tabela são feitas no script do grupo e copiadas para cá.
+
+A API foi testada sobre o script completo do grupo (tabelas, dados de exemplo, procedures, packages e
+gatilhos): login, sinal, repetição, heartbeat e gestão de totens funcionam, e o gatilho
+`TRG_TOTEM_ULTIMO_SINAL` atualiza o último sinal do totem. Colunas que esta API usa com nome diferente do
+modelo antigo: `TOTEM.NOME_IDENTIFICADOR` e `SINAL_TOTEM.SOLICITACAO_EMBARQUE_ID`.
+
+> [!NOTE]
+> Os totens de exemplo do script do grupo têm `TOKEN_HASH` em SHA-256 simples, então não entram pela API.
+> Para usar um deles, grave o HMAC do segredo (a API aceita o hex em maiúsculas ou minúsculas) ou cadastre
+> o totem por `POST /api/totens`. Os documentos de `eventos_totem` usam os campos `totem` e `data_hora`,
+> como no script MongoDB do grupo; o campo `tipo` desta API vale `SINAL_RECEBIDO`, `SINAL_REPETIDO` ou
+> `HEARTBEAT`. O script MongoDB do grupo apaga a coleção `eventos_totem` ao rodar.
 
 | Tabela | Acesso desta API |
 | --- | --- |
@@ -745,7 +758,8 @@ Para publicar (Azure App Service for Containers, Render ou similar):
 - [ ] **Contrato da fila `sinal-totem`:** validar com quem faz o consumidor Java.
 - [ ] **Firmware do totem:** gerar a `Idempotency-Key` uma vez por acionamento e reutilizá-la nos reenvios; tratar 401 (refazer o login), 429 e 503 (esperar o `Retry-After`).
 - [ ] **App Mobile:** definir se alguma tela usa esta API (por exemplo, a gestão de totens pelo gestor).
-- [ ] Corrigir no DDL original do grupo o comentário depois de `;` em `idx_tentativa_veic_res`.
+- [ ] **Script Oracle do grupo:** tirar a linha em branco dentro do `SELECT PKG_INDICADORES...` (perto da linha 1383), que quebra a execução no SQL*Plus.
+- [ ] **Totens de exemplo do grupo:** gravar `TOKEN_HASH` com HMAC, e não SHA-256 simples, para que entrem pela API.
 
 ### Melhorias técnicas planejadas
 

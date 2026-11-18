@@ -14,7 +14,7 @@ VALUES ('Gestor Dev', 'gestor@paradacerta.dev',
 INSERT INTO parada (codigo_sptrans, nome, endereco, latitude, longitude)
 VALUES (340015329, 'Av. Paulista, 1578 - MASP', 'Av. Paulista, 1578 - Bela Vista, São Paulo', -23.561414, -46.655881);
 
-INSERT INTO totem (parada_id, identificador, token_hash, status)
+INSERT INTO totem (parada_id, nome_identificador, token_hash, status)
 SELECT id, 'TOTEM-0001', '471be972f0b30f9f3d96920d31d0b7a8b7f94f267ec9e28a4d0cff0ba9be76b5', 'ATIVO'
 FROM parada WHERE codigo_sptrans = 340015329;
 

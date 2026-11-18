@@ -34,8 +34,8 @@ public class ParadaCertaDbContext(DbContextOptions<ParadaCertaDbContext> options
             e.HasKey(p => p.Id);
             e.Property(p => p.Id).HasColumnName("ID").ValueGeneratedOnAdd();
             e.Property(p => p.CodigoSptrans).HasColumnName("CODIGO_SPTRANS");
-            e.Property(p => p.Nome).HasColumnName("NOME").HasMaxLength(150);
-            e.Property(p => p.Endereco).HasColumnName("ENDERECO").HasMaxLength(250);
+            e.Property(p => p.Nome).HasColumnName("NOME").HasMaxLength(120);
+            e.Property(p => p.Endereco).HasColumnName("ENDERECO").HasMaxLength(200);
             e.Property(p => p.Latitude).HasColumnName("LATITUDE").HasPrecision(9, 6);
             e.Property(p => p.Longitude).HasColumnName("LONGITUDE").HasPrecision(9, 6);
         });
@@ -46,7 +46,7 @@ public class ParadaCertaDbContext(DbContextOptions<ParadaCertaDbContext> options
             e.HasKey(t => t.Id);
             e.Property(t => t.Id).HasColumnName("ID").ValueGeneratedOnAdd();
             e.Property(t => t.ParadaId).HasColumnName("PARADA_ID");
-            e.Property(t => t.Identificador).HasColumnName("IDENTIFICADOR").HasMaxLength(30);
+            e.Property(t => t.Identificador).HasColumnName("NOME_IDENTIFICADOR").HasMaxLength(30);
             e.Property(t => t.TokenHash).HasColumnName("TOKEN_HASH").HasMaxLength(64).IsFixedLength();
             e.Property(t => t.Status).HasColumnName("STATUS").HasMaxLength(10).HasConversion(
                 v => v.ToString().ToUpperInvariant(),
@@ -68,7 +68,7 @@ public class ParadaCertaDbContext(DbContextOptions<ParadaCertaDbContext> options
                 v => v.ToString().ToUpperInvariant(),
                 v => Enum.Parse<TipoSinal>(v, true));
             e.Property(s => s.UidHash).HasColumnName("UID_HASH").HasMaxLength(64).IsFixedLength();
-            e.Property(s => s.SolicitacaoId).HasColumnName("SOLICITACAO_ID");
+            e.Property(s => s.SolicitacaoId).HasColumnName("SOLICITACAO_EMBARQUE_ID");
             e.Property(s => s.RecebidoEm).HasColumnName("RECEBIDO_EM");
             e.HasIndex(s => s.ChaveIdempotencia).IsUnique();
             e.HasOne(s => s.Totem).WithMany().HasForeignKey(s => s.TotemId);
@@ -80,8 +80,8 @@ public class ParadaCertaDbContext(DbContextOptions<ParadaCertaDbContext> options
             e.HasKey(u => u.Id);
             e.Property(u => u.Id).HasColumnName("ID").ValueGeneratedOnAdd();
             e.Property(u => u.Nome).HasColumnName("NOME").HasMaxLength(120);
-            e.Property(u => u.Email).HasColumnName("EMAIL").HasMaxLength(160);
-            e.Property(u => u.SenhaHash).HasColumnName("SENHA_HASH").HasMaxLength(100);
+            e.Property(u => u.Email).HasColumnName("EMAIL").HasMaxLength(60);
+            e.Property(u => u.SenhaHash).HasColumnName("SENHA_HASH").HasMaxLength(160);
             e.Property(u => u.Perfil).HasColumnName("PERFIL").HasMaxLength(10);
             e.HasIndex(u => u.Email).IsUnique();
         });

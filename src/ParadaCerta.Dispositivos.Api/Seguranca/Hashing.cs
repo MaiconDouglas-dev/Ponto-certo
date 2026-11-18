@@ -57,11 +57,14 @@ public sealed class HashSegredo(IOptions<CartaoOptions> opcoes) : IHashSegredo
     public string Calcular(string segredo) =>
         Convert.ToHexStringLower(HMACSHA256.HashData(_chave, Encoding.UTF8.GetBytes(segredo.Trim())));
 
-    /// <summary>Compara em tempo constante, para não vazar informação pelo tempo de resposta.</summary>
+    /// <summary>
+    /// Compara em tempo constante, para não vazar informação pelo tempo de resposta.
+    /// Aceita o hex gravado em maiúsculas (RAWTOHEX do Oracle) ou em minúsculas.
+    /// </summary>
     public bool Confere(string segredo, string hashGravado)
     {
         var calculado = Encoding.ASCII.GetBytes(Calcular(segredo));
-        var gravado = Encoding.ASCII.GetBytes(hashGravado.Trim());
+        var gravado = Encoding.ASCII.GetBytes(hashGravado.Trim().ToLowerInvariant());
         return CryptographicOperations.FixedTimeEquals(calculado, gravado);
     }
 

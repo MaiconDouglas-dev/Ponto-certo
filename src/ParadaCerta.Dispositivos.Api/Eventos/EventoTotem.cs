@@ -15,8 +15,8 @@ public sealed class EventoTotem
 {
     [BsonId] public ObjectId Id { get; set; }
     [BsonElement("tipo")] public string Tipo { get; set; } = string.Empty;
-    [BsonElement("totemIdentificador")] public string TotemIdentificador { get; set; } = string.Empty;
-    [BsonElement("ocorridoEm")] public DateTime OcorridoEm { get; set; }
+    [BsonElement("totem")] public string TotemIdentificador { get; set; } = string.Empty;
+    [BsonElement("data_hora")] public DateTime OcorridoEm { get; set; }
 
     [BsonElement("sinalId"), BsonIgnoreIfNull] public long? SinalId { get; set; }
     [BsonElement("chaveIdempotencia"), BsonIgnoreIfNull] public string? ChaveIdempotencia { get; set; }
